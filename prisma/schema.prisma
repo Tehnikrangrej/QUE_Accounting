@@ -1,0 +1,241 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("USER") // USER | ADMIN
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  permission Permission?
+}
+
+/* =========================
+   Customer
+========================= */
+model Customer {
+  id              String   @id @default(uuid())
+
+  /* =========================
+     CUSTOMER DETAILS
+  ========================= */
+  company         String   // Required
+  vatNumber       String?
+  phone           String?
+  website         String?
+
+  group           String?  // Customer group
+
+  currency        String   @default("SYSTEM")
+  defaultLanguage String   @default("SYSTEM")
+
+  /* =========================
+     ADDRESS
+  ========================= */
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String?
+
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  /* =========================
+     RELATIONS
+  ========================= */
+  invoices        Invoice[]
+}
+
+
+/* =========================
+   STAFF / SALE AGENT
+========================= */
+model Staff {
+  id        String   @id @default(uuid())
+  fullName  String
+  email     String?  @unique
+  role      String   @default("SALES")
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices  Invoice[]
+}
+
+/* =========================
+   ITEM GROUP
+========================= */
+model ItemGroup {
+  id        String   @id @default(uuid())
+  name      String
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     Item[]
+}
+
+/* =========================
+   TAX
+========================= */
+model Tax {
+  id        String   @id @default(uuid())
+  name      String
+  rate      Float
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  itemsTax1 Item[] @relation("ItemTax1")
+  itemsTax2 Item[] @relation("ItemTax2")
+}
+
+/* =========================
+   ITEM / PRODUCT / SERVICE
+========================= */
+model Item {
+  id          String   @id @default(uuid())
+
+  name        String
+  longDesc    String?
+
+  rate        Float
+  unit        String?
+
+  groupId     String?
+  group       ItemGroup? @relation(fields: [groupId], references: [id])
+
+  tax1Id      String?
+  tax1        Tax? @relation("ItemTax1", fields: [tax1Id], references: [id])
+
+  tax2Id      String?
+  tax2        Tax? @relation("ItemTax2", fields: [tax2Id], references: [id])
+
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoiceItems InvoiceItem[]
+}
+
+/* =========================
+   INVOICE
+========================= */
+model Invoice {
+  id              String   @id @default(uuid())
+  invoiceNumber   String   @unique
+
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  saleAgentId     String?
+  saleAgent       Staff?   @relation(fields: [saleAgentId], references: [id])
+
+  invoiceDate     DateTime
+  dueDate         DateTime
+
+  currency        String   @default("USD")
+  paymentMode     String?
+  tags            String?
+
+  quantityType    String   @default("QTY") // QTY | HOURS | BOTH
+
+  isRecurring     Boolean  @default(false)
+  recurringEvery  Int?
+  recurringStart  DateTime?
+  recurringEnd    DateTime?
+  nextRunDate     DateTime?
+
+  preventReminder Boolean  @default(false)
+
+  subTotal        Float    @default(0)
+
+  discountType    String?  // PERCENT | FIXED
+  discountValue   Float    @default(0)
+  discountAmount  Float    @default(0)
+
+  adjustment      Float    @default(0)
+
+  total           Float    @default(0)
+
+  adminNote       String?
+  clientNote      String?
+  terms           String?
+
+  status          String   @default("DRAFT") // DRAFT, SENT, PAID, CANCELLED
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  street    String?
+  city      String?
+  state     String?
+  zipCode   String?
+  country   String?
+
+  items           InvoiceItem[]
+}
+
+/* =========================
+   INVOICE ITEM
+========================= */
+model InvoiceItem {
+  id            String  @id @default(uuid())
+
+  invoiceId     String
+  invoice       Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  itemId        String?
+  item          Item?   @relation(fields: [itemId], references: [id])
+
+  itemName      String
+  description   String?
+
+  qty           Float    @default(1)
+  hours         Float?
+
+  rate          Float    @default(0)
+
+  taxName       String?
+  taxRate       Float    @default(0)
+  taxAmount     Float    @default(0)
+
+  amount        Float    @default(0)
+
+  createdAt     DateTime @default(now())
+}
+
+model Permission {
+  id        Int @id @default(autoincrement())
+
+  userId    Int @unique   // 👈 THIS MUST BE HERE
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  canCreateInvoice Boolean @default(false)
+  canViewInvoice   Boolean @default(false)
+  canUpdateInvoice Boolean @default(false)
+  canDeleteInvoice Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
