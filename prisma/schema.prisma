@@ -20,7 +20,7 @@ model User {
   role      String   @default("USER") // USER | ADMIN
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  customers Customer[] @relation("CustomerAdmins")
   permission Permission?
 }
 
@@ -33,24 +33,42 @@ model Customer {
   /* =========================
      CUSTOMER DETAILS
   ========================= */
-  company         String   // Required
+  company         String
   vatNumber       String?
   phone           String?
   website         String?
 
-  group           String?  // Customer group
+  group           String?
 
   currency        String   @default("SYSTEM")
   defaultLanguage String   @default("SYSTEM")
 
   /* =========================
-     ADDRESS
+     MAIN COMPANY ADDRESS
   ========================= */
   address         String?
   city            String?
   state           String?
   zipCode         String?
   country         String?
+
+  /* =========================
+     BILLING ADDRESS
+  ========================= */
+  billingStreet   String?
+  billingCity     String?
+  billingState    String?
+  billingZipCode  String?
+  billingCountry  String?
+
+  /* =========================
+     SHIPPING ADDRESS
+  ========================= */
+  shippingStreet  String?
+  shippingCity    String?
+  shippingState   String?
+  shippingZipCode String?
+  shippingCountry String?
 
   isActive        Boolean  @default(true)
 
@@ -61,7 +79,9 @@ model Customer {
      RELATIONS
   ========================= */
   invoices        Invoice[]
+  admins          User[]   @relation("CustomerAdmins")
 }
+
 
 
 /* =========================

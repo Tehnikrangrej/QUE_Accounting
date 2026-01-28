@@ -1,102 +1,316 @@
 const prisma = require("../lib/prisma");
 
-/* =========================
-   CREATE CUSTOMER (ADMIN / SUPERADMIN)
-========================= */
+/**
+ * ============================
+ * CREATE CUSTOMER (ADMIN / SUPERADMIN)
+ * ============================
+ */
 exports.createCustomer = async (req, res) => {
   try {
-    const data = req.body;
+    const {
+      company,
+      vatNumber,
+      phone,
+      website,
+      group,
+      currency,
+      defaultLanguage,
+
+      // main address
+      address,
+      city,
+      state,
+      zipCode,
+      country,
+
+      // billing
+      billingStreet,
+      billingCity,
+      billingState,
+      billingZipCode,
+      billingCountry,
+
+      // shipping
+      shippingStreet,
+      shippingCity,
+      shippingState,
+      shippingZipCode,
+      shippingCountry,
+
+      sameAsBilling,
+    } = req.body;
+
+    if (!company) {
+      return res.status(400).json({
+        success: false,
+        message: "Company name is required",
+      });
+    }
+
+    let finalShipping = {
+      shippingStreet,
+      shippingCity,
+      shippingState,
+      shippingZipCode,
+      shippingCountry,
+    };
+
+    if (sameAsBilling) {
+      finalShipping = {
+        shippingStreet: billingStreet,
+        shippingCity: billingCity,
+        shippingState: billingState,
+        shippingZipCode: billingZipCode,
+        shippingCountry: billingCountry,
+      };
+    }
 
     const customer = await prisma.customer.create({
-      data,
+      data: {
+        company,
+        vatNumber,
+        phone,
+        website,
+        group,
+        currency,
+        defaultLanguage,
+
+        address,
+        city,
+        state,
+        zipCode,
+        country,
+
+        billingStreet,
+        billingCity,
+        billingState,
+        billingZipCode,
+        billingCountry,
+
+        ...finalShipping,
+      },
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: "Customer created successfully",
       customer,
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+  } catch (error) {
+    console.error("Create customer error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-/* =========================
-   GET ALL CUSTOMERS (ALL LOGGED IN USERS)
-========================= */
+/**
+ * ============================
+ * GET ALL CUSTOMERS (ALL LOGGED IN USERS)
+ * ============================
+ */
 exports.getAllCustomers = async (req, res) => {
   try {
     const customers = await prisma.customer.findMany({
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ success: true, customers });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    return res.json({
+      success: true,
+      count: customers.length,
+      customers,
+    });
+  } catch (error) {
+    console.error("Get all customers error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-/* =========================
-   GET SINGLE CUSTOMER
-========================= */
+/**
+ * ============================
+ * GET CUSTOMER BY ID
+ * ============================
+ */
 exports.getCustomerById = async (req, res) => {
   try {
     const { id } = req.params;
 
     const customer = await prisma.customer.findUnique({
       where: { id },
-      include: { invoices: true },
     });
 
     if (!customer) {
-      return res.status(404).json({ message: "Customer not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
     }
 
-    res.json({ success: true, customer });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    return res.json({
+      success: true,
+      customer,
+    });
+  } catch (error) {
+    console.error("Get customer error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
+  
 };
 
-/* =========================
-   UPDATE CUSTOMER (ADMIN / SUPERADMIN)
-========================= */
+/**
+ * ============================
+ * UPDATE CUSTOMER (ADMIN / SUPERADMIN)
+ * ============================
+ */
 exports.updateCustomer = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const customer = await prisma.customer.update({
+    // prevent dangerous updates
+    delete req.body.id;
+    delete req.body.createdAt;
+    delete req.body.updatedAt;
+
+    const existing = await prisma.customer.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
+
+    // handle sameAsBilling logic
+    if (req.body.sameAsBilling) {
+      req.body.shippingStreet = req.body.billingStreet;
+      req.body.shippingCity = req.body.billingCity;
+      req.body.shippingState = req.body.billingState;
+      req.body.shippingZipCode = req.body.billingZipCode;
+      req.body.shippingCountry = req.body.billingCountry;
+    }
+
+    delete req.body.sameAsBilling;
+
+    const updated = await prisma.customer.update({
       where: { id },
       data: req.body,
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: "Customer updated successfully",
-      customer,
+      customer: updated,
     });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
+  } catch (error) {
+    console.error("Update customer error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-/* =========================
-   DELETE CUSTOMER (SUPERADMIN ONLY)
-========================= */
+/**
+ * ============================
+ * DELETE CUSTOMER (SUPERADMIN ONLY)
+ * ============================
+ */
 exports.deleteCustomer = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const existing = await prisma.customer.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
 
     await prisma.customer.delete({
       where: { id },
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: "Customer deleted successfully",
     });
+  } catch (error) {
+    console.error("Delete customer error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// POST /customers/:id/admins
+exports.assignAdmin = async (req, res) => {
+  try {
+    const { id } = req.params; // customerId
+    const { userId } = req.body;
+
+    const customer = await prisma.customer.update({
+      where: { id },
+      data: {
+        admins: {
+          connect: { id: userId }
+        }
+      },
+      include: {
+        admins: true
+      }
+    });
+
+    res.json({
+      success: true,
+      message: "Admin assigned successfully",
+      customer
+    });
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+// DELETE /customers/:id/admins/:userId
+exports.removeAdmin = async (req, res) => {
+  try {
+    const { id } = req.params; // customerId
+    const userId = Number(req.params.userId); // 👈 convert to number
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid userId is required"
+      });
+    }
+
+    const customer = await prisma.customer.update({
+      where: { id },
+      data: {
+        admins: {
+          disconnect: [{ id: userId }]  // 👈 MUST BE ARRAY + number
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      message: "Admin removed successfully"
+    });
+  } catch (err) {
+    console.error("REMOVE ADMIN ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
