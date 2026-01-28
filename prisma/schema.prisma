@@ -20,7 +20,7 @@ model User {
   role      String   @default("USER") // USER | ADMIN
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  customers Customer[] @relation("CustomerAdmins")
+  
   permission Permission?
 }
 
@@ -79,7 +79,7 @@ model Customer {
      RELATIONS
   ========================= */
   invoices        Invoice[]
-  admins          User[]   @relation("CustomerAdmins")
+  
 }
 
 
