@@ -135,21 +135,64 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
   const { name, role } = req.body;
-  const { password } = req.body;
-
-  if (password) {
-    const hashed = await bcrypt.hash(password, 10);
-    await prisma.user.update({
-      where: { id: Number(id) },
-      data: { password: hashed }
-    });
-  }
   const user = await prisma.user.update({
     where: { id: Number(id) },
     data: { name, role }
   });
 
   res.json(user);
+};
+
+/** ===============================
+ * ADMIN: Reset User Password
+ * =============================== */
+exports.adminResetUserPassword = async (req, res) => {
+  try {
+    // Only admin or superadmin
+    if (req.user.role !== "ADMIN" && req.user.role !== "SUPERADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to perform this action"
+      });
+    }
+
+    const { userId, newPassword } = req.body;
+
+    if (!userId || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and newPassword are required"
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashed }
+    });
+
+    res.json({
+      success: true,
+      message: "User password reset successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
 };
 
 /**
