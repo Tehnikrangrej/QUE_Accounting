@@ -14,6 +14,11 @@ app.get("/", (req, res) => {
   res.send("API is running...");
 });
 
+app.use("/uploads", express.static("uploads"));
+app.use("/api/settings", require("./routes/tenantConfiguration.routes"));
+
+
+
 app.use("/api/users", require("./routes/user.routes"));
 app.use("/api/customers", require("./routes/customer.routes"));
 app.use("/api/invoices", require("./routes/invoice.routes"));
