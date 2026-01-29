@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-
+const authMiddleware = require("../middleware/auth");
 // Controller
 const controller = require("../controller/tenantConfiguration.controller");
 
@@ -31,12 +31,12 @@ const upload = multer({
 // ================================
 
 // Get settings
-router.get("/",  controller.getTenantConfiguration);
+router.get("/", authMiddleware, controller.getTenantConfiguration);
 
 // Create settings (ONLY ONCE)
-router.post("/", upload.single("companyLogo"), controller.createTenantConfiguration);
+router.post("/", authMiddleware, upload.single("companyLogo"), controller.createTenantConfiguration);
 
 // Update settings
-router.put("/",  upload.single("companyLogo"), controller.updateTenantConfiguration);
+router.put("/", authMiddleware, upload.single("companyLogo"), controller.updateTenantConfiguration);
 
 module.exports = router;

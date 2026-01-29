@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "author": "",
   "license": "ISC",

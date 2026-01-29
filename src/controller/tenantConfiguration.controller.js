@@ -1,29 +1,45 @@
-const prisma = require ("../lib/prisma");
+const prisma = require("../lib/prisma");
 
 exports.getTenantConfiguration = async (req, res) => {
-  const config = await prisma.tenantConfiguration.findUnique({
-    where: { id: 1 },
-  });
+  try {
+    const userId = req.user.id; // 🔐 from JWT
 
-  return res.json({
-    success: true,
-    data: config,
-  });
+    const config = await prisma.tenantConfiguration.findUnique({
+      where: { userId },
+    });
+
+    return res.json({
+      success: true,
+      data: config,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
 };
+/**
+ * ============================
+ * CREATE SETTINGS (ONLY ONCE)
+ * ============================
+ */
 exports.createTenantConfiguration = async (req, res) => {
   try {
+    const userId = req.user.id;
+
     const exists = await prisma.tenantConfiguration.findUnique({
-      where: { id: 1 },
+      where: { userId },
     });
 
     if (exists) {
       return res.status(400).json({
         success: false,
-        message: "Tenant configuration already exists. Use update API.",
+        message: "Settings already exist. Use update API.",
       });
     }
 
-    const data = req.body;
+    const data = { ...req.body };
 
     if (req.file) {
       data.companyLogo = `/uploads/${req.file.filename}`;
@@ -31,51 +47,65 @@ exports.createTenantConfiguration = async (req, res) => {
 
     const config = await prisma.tenantConfiguration.create({
       data: {
-        id: 1, // 🔒 force single row
         ...data,
+        userId, // 🔐 attach to logged in user
       },
     });
 
     return res.json({
       success: true,
-      message: "Tenant configuration created",
+      message: "Settings created successfully",
       data: config,
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
+
+/**
+ * ============================
+ * UPDATE SETTINGS
+ * ============================
+ */
 exports.updateTenantConfiguration = async (req, res) => {
   try {
+    const userId = req.user.id;
+
     const exists = await prisma.tenantConfiguration.findUnique({
-      where: { id: 1 },
+      where: { userId },
     });
 
     if (!exists) {
       return res.status(404).json({
         success: false,
-        message: "Tenant configuration does not exist. Create it first.",
+        message: "Settings not found. Create it first.",
       });
     }
 
-    const data = req.body;
+    const data = { ...req.body };
 
     if (req.file) {
       data.companyLogo = `/uploads/${req.file.filename}`;
     }
 
     const config = await prisma.tenantConfiguration.update({
-      where: { id: 1 },
+      where: { userId },
       data,
     });
 
     return res.json({
       success: true,
-      message: "Tenant configuration updated",
+      message: "Settings updated successfully",
       data: config,
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
