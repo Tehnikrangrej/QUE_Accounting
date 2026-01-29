@@ -22,11 +22,6 @@ app.use("/api/settings", require("./routes/tenantConfiguration.routes"));
 app.use("/api/users", require("./routes/user.routes"));
 app.use("/api/customers", require("./routes/customer.routes"));
 app.use("/api/invoices", require("./routes/invoice.routes"));
-app.use("/api/staff", require("./routes/staff.routes"));
-app.use("/api/item-groups", require("./routes/itemGroup.routes"));
-app.use("/api/taxes", require("./routes/tax.routes"));
-app.use("/api/items", require("./routes/item.routes"));
-app.use("/api/invoices", require("./routes/invoice.routes"));
 app.use("/api/permissions", require("./routes/permission.routes"));
 
 module.exports = app;
