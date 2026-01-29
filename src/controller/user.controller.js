@@ -135,7 +135,15 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
   const { name, role } = req.body;
+  const { password } = req.body;
 
+  if (password) {
+    const hashed = await bcrypt.hash(password, 10);
+    await prisma.user.update({
+      where: { id: Number(id) },
+      data: { password: hashed }
+    });
+  }
   const user = await prisma.user.update({
     where: { id: Number(id) },
     data: { name, role }
