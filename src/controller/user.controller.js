@@ -51,9 +51,9 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { email } });
+   const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(404).json({ message: "User not found" });
-
+    
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) return res.status(401).json({ message: "Invalid password" });
 
