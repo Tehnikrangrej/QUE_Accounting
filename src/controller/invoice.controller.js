@@ -1,4 +1,6 @@
 const prisma = require("../lib/prisma");
+const generateInvoicePdf = require("../utils/generateInvoicePdf");
+const uploadInvoicePdf = require("../utils/uploadInvoicePdf");
 
 /* ===============================
    CREATE INVOICE
@@ -25,7 +27,6 @@ exports.createInvoice = async (req, res) => {
       });
     }
 
-    // 🔢 Safe invoice number
     const lastInvoice = await prisma.invoice.findFirst({
       orderBy: { createdAt: "desc" },
       select: { invoiceNumber: true },
@@ -38,7 +39,6 @@ exports.createInvoice = async (req, res) => {
 
     const invoiceNumber = `INV-${String(nextNumber).padStart(6, "0")}`;
 
-    // 🧮 Calculate totals
     let subTotal = 0;
     let totalTax = 0;
 
@@ -63,7 +63,7 @@ exports.createInvoice = async (req, res) => {
 
     const grandTotal = subTotal + totalTax - Number(discount);
 
-    // 💾 Save
+    // 💾 Create invoice (UNCHANGED)
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
@@ -79,10 +79,25 @@ exports.createInvoice = async (req, res) => {
         totalTax,
         discount,
         grandTotal,
-        items: {
-          create: invoiceItems,
-        },
+        items: { create: invoiceItems },
       },
+      include: {
+        customer: true,
+        items: true,
+      },
+    });
+
+    // 📄 PDF GENERATION (ADDED)
+    const tenant = await prisma.tenantConfiguration.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    const pdfBuffer = await generateInvoicePdf(invoice, tenant);
+    const pdfUrl = await uploadInvoicePdf(pdfBuffer, invoice.invoiceNumber);
+
+    const updatedInvoice = await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { pdfUrl },
       include: {
         customer: true,
         items: true,
@@ -91,9 +106,10 @@ exports.createInvoice = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Invoice created successfully",
-      data: invoice,
+      message: "Invoice created successfully & PDF generated",
+      data: updatedInvoice,
     });
+
   } catch (error) {
     console.error("Create Invoice Error:", error);
     res.status(500).json({
@@ -131,5 +147,26 @@ exports.updateInvoiceStatus = async (req, res) => {
 exports.deleteInvoice = async (req, res) => {
   await prisma.invoice.delete({ where: { id: req.params.id } });
   res.json({ success: true, message: "Invoice deleted" });
+};
+
+exports.downloadInvoicePdf = async (req, res) => {
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: req.params.id },
+  });
+
+  if (!invoice?.pdfUrl) {
+    return res.status(404).json({
+      success: false,
+      message: "PDF not found",
+    });
+  }
+
+  // 🔥 Force correct PDF handling
+  const downloadUrl = invoice.pdfUrl.replace(
+    "/upload/",
+    "/upload/fl_attachment/"
+  );
+
+  res.redirect(downloadUrl);
 };
 
