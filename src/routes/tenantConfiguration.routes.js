@@ -33,10 +33,12 @@ const upload = multer({
 // Get settings
 router.get("/", authMiddleware, controller.getTenantConfiguration);
 
-// Create settings (ONLY ONCE)
-router.post("/", authMiddleware, upload.single("companyLogo"), controller.createTenantConfiguration);
-
-// Update settings
-router.put("/", authMiddleware, upload.single("companyLogo"), controller.updateTenantConfiguration);
+// Save settings (CREATE or UPDATE)
+router.post(
+  "/",
+  authMiddleware,
+  upload.single("companyLogo"),
+  controller.saveTenantConfiguration
+);
 
 module.exports = router;
