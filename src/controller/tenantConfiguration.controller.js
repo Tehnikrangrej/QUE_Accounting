@@ -28,49 +28,33 @@ exports.saveTenantConfiguration = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const exists = await prisma.tenantConfiguration.findUnique({
-      where: { userId },
-    });
-
     const data = { ...req.body };
 
+    // ✅ Cloudinary URL
     if (req.file) {
-      data.companyLogo = `/uploads/${req.file.filename}`;
+      data.companyLogo = req.file.path;
     }
 
-    let config;
-
-    if (!exists) {
-      // 🆕 CREATE
-      config = await prisma.tenantConfiguration.create({
-        data: {
-          ...data,
-          userId,
-        },
-      });
-
-      return res.json({
-        success: true,
-        message: "Settings created successfully",
-        data: config,
-      });
-    }
-
-    // ✏️ UPDATE
-    config = await prisma.tenantConfiguration.update({
+    const config = await prisma.tenantConfiguration.upsert({
       where: { userId },
-      data,
+      create: {
+        ...data,
+        userId,
+      },
+      update: {
+        ...data,
+      },
     });
 
     return res.json({
       success: true,
-      message: "Settings updated successfully",
+      message: "Settings saved successfully",
       data: config,
     });
-  } catch (err) {
+  } catch (error) {
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: error.message,
     });
   }
 };

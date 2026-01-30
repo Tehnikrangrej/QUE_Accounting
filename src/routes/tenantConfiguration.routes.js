@@ -1,43 +1,40 @@
 const express = require("express");
 const router = express.Router();
+
+// Auth middleware (JWT)
 const authMiddleware = require("../middleware/auth");
+
 // Controller
 const controller = require("../controller/tenantConfiguration.controller");
 
-// Auth middleware (if you use it)
+// Cloudinary upload middleware
+const upload = require("../middleware/cloudUpload");
 
-// Multer for logo upload
-const multer = require("multer");
-const path = require("path");
+/* ================================
+   TENANT CONFIGURATION ROUTES
+================================ */
 
-// Storage config
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueName + path.extname(file.originalname));
-  },
-});
+/**
+ * GET Tenant Configuration
+ * - Used to load settings page
+ * - Returns null if not created
+ */
+router.get(
+  "/",
+  authMiddleware,
+  controller.getTenantConfiguration
+);
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-});
-
-// ================================
-// ROUTES
-// ================================
-
-// Get settings
-router.get("/", authMiddleware, controller.getTenantConfiguration);
-
-// Save settings (CREATE or UPDATE)
+/**
+ * CREATE OR UPDATE Tenant Configuration
+ * - First time → CREATE
+ * - Next time → UPDATE
+ * - Uploads company logo to Cloudinary
+ */
 router.post(
   "/",
   authMiddleware,
-  upload.single("companyLogo"),
+  upload.single("companyLogo"), // cloud upload
   controller.saveTenantConfiguration
 );
 
