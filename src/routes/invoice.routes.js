@@ -1,19 +1,56 @@
 const router = require("express").Router();
 const controller = require("../controller/invoice.controller");
+const auth = require("../middleware/auth");
 const checkPermission = require("../middleware/checkInvoicePermission");
-router.post("/", controller.createInvoice);
-router.get("/", controller.getAllInvoices);
-router.get("/:id", controller.getInvoiceById);
-router.delete("/:id", controller.deleteInvoice);
-router.patch("/:id/status", controller.updateInvoiceStatus);
-router.get("/:id/pdf", controller.downloadInvoicePDF);
 
+/* ===============================
+   CREATE INVOICE
+================================ */
+router.post(
+  "/",
+  auth,
+  checkPermission("create"),
+  controller.createInvoice
+);
 
-router.post("/", checkPermission("create"), controller.createInvoice);
-router.get("/", checkPermission("view"), controller.getAllInvoices);
-router.get("/:id", checkPermission("view"), controller.getInvoiceById);
-router.delete("/:id", checkPermission("delete"), controller.deleteInvoice);
-router.patch("/:id/status", checkPermission("update"), controller.updateInvoiceStatus);
-router.get("/:id/pdf", checkPermission("view"), controller.downloadInvoicePDF);
+/* ===============================
+   GET ALL INVOICES
+================================ */
+router.get(
+  "/",
+  auth,
+  checkPermission("view"),
+  controller.getAllInvoices
+);
+
+/* ===============================
+   GET SINGLE INVOICE
+================================ */
+router.get(
+  "/:id",
+  auth,
+  checkPermission("view"),
+  controller.getInvoiceById
+);
+
+/* ===============================
+   UPDATE STATUS
+================================ */
+router.patch(
+  "/:id/status",
+  auth,
+  checkPermission("update"),
+  controller.updateInvoiceStatus
+);
+
+/* ===============================
+   DELETE INVOICE
+================================ */
+router.delete(
+  "/:id",
+  auth,
+  checkPermission("delete"),
+  controller.deleteInvoice
+);
 
 module.exports = router;

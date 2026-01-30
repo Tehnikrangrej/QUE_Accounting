@@ -1,33 +1,47 @@
 const prisma = require("../lib/prisma");
-module.exports = (action) => {
+
+const checkPermission = (action) => {
   return async (req, res, next) => {
     try {
-      // SuperAdmin bypass
-      if (req.user.role === "SUPERADMIN") return next();
+      // 🔐 SUPERADMIN → FULL ACCESS (NO PERMISSION CHECK)
+      if (req.user.role === "SUPERADMIN") {
+        return next();
+      }
 
+      // 👤 USER → CHECK PERMISSIONS
       const permission = await prisma.permission.findUnique({
-        where: { userId: req.user.id }
+        where: { userId: req.user.id },
       });
 
       if (!permission) {
-        return res.status(403).json({ message: "No permissions assigned" });
+        return res.status(403).json({
+          success: false,
+          message: "No permissions assigned",
+        });
       }
 
       const map = {
         create: permission.canCreateInvoice,
         view: permission.canViewInvoice,
         update: permission.canUpdateInvoice,
-        delete: permission.canDeleteInvoice
+        delete: permission.canDeleteInvoice,
       };
 
       if (!map[action]) {
-        return res.status(403).json({ message: "Permission denied" });
+        return res.status(403).json({
+          success: false,
+          message: `You do not have permission to ${action} invoices`,
+        });
       }
 
       next();
-
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
     }
   };
 };
+
+module.exports = checkPermission;
