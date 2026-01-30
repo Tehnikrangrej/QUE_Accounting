@@ -1,7 +1,8 @@
 const puppeteer = require("puppeteer");
-const invoiceTemplate = require("./invoiceTemplate");
+const invoiceTemplate = require("./invoiceTemplate"); // ✅ SAME FOLDER
 
-module.exports = async (invoice, tenant) => {
+
+module.exports = async function generateInvoicePdf(invoice, tenant) {
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -9,6 +10,7 @@ module.exports = async (invoice, tenant) => {
 
   const page = await browser.newPage();
 
+  // HTML from template
   const html = invoiceTemplate(invoice, tenant);
 
   await page.setContent(html, {

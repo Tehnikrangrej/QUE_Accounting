@@ -3,85 +3,127 @@ module.exports = (invoice, tenant) => `
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Tax Invoice</title>
-
 <style>
   body {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
     color: #000;
-    padding: 35px;
+    padding: 40px;
   }
 
   .header {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
     border-bottom: 2px solid #999;
-    padding-bottom: 10px;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
   }
 
-  .logo-box {
-    display: flex;
-    gap: 10px;
-    align-items: center;
+  .logo {
+    width: 120px;
   }
 
-  .logo-box img {
-    height: 55px;
+  .logo img {
+    max-width: 100%;
+    height: auto;
   }
 
-  .company-details {
+  .company-info {
+    text-align: left;
     font-size: 11px;
     line-height: 1.4;
   }
 
+  .company-info .name {
+    font-weight: bold;
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+
   .invoice-title {
     text-align: right;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
-    color: #003366;
+    color: #0a3d91;
   }
 
-  .top-info {
+  .invoice-number {
+    font-size: 11px;
+    font-weight: normal;
+    color: #000;
+  }
+
+
+  .company {
     display: flex;
-    justify-content: space-between;
-    margin-top: 15px;
+    gap: 12px;
+    align-items: center;
   }
 
-  .info-box {
-    width: 32%;
+  .company img {
+    height: 55px;
+    object-fit: contain;
+  }
+
+  .company-details {
+    line-height: 1.4;
+  }
+
+  .company-details strong {
+    font-size: 13px;
+  }
+
+  .tax-box {
+    text-align: right;
+    font-weight: bold;
+    color: #0a3d91;
+    font-size: 15px;
+  }
+
+  /* ===== META ===== */
+  .meta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+
+  .meta-box {
     border: 1px solid #ccc;
     padding: 8px;
   }
 
-  .info-box strong {
-    color: #003366;
-  }
-
+  /* ===== ADDRESS ===== */
   .address-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
   }
 
   .address-box {
-    width: 50%;
     border: 1px solid #ccc;
     padding: 8px;
   }
 
+  .address-box strong {
+    color: #0a3d91;
+  }
+
+  /* ===== TABLE ===== */
   table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
+    margin-top: 10px;
   }
 
   thead th {
-    background: #003366;
+    background: #0a3d91;
     color: #fff;
     padding: 8px;
     font-size: 11px;
-    text-align: left;
+    text-align: center;
   }
 
   tbody td {
@@ -90,55 +132,53 @@ module.exports = (invoice, tenant) => `
     border-bottom: 1px solid #ddd;
   }
 
-  .summary-row {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 20px;
+  tbody td:nth-child(2) {
+    text-align: left;
   }
 
-  .tax-summary,
-  .total-summary {
-    width: 48%;
+  tbody td:not(:nth-child(2)) {
+    text-align: center;
+  }
+
+  /* ===== SUMMARY ===== */
+  .summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 15px;
+  }
+
+  .summary-box {
     border: 1px solid #ccc;
-    padding: 10px;
+    padding: 8px;
   }
 
-  .total-summary div {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 6px;
+  .totals table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .totals td {
+    padding: 6px;
+    font-size: 11px;
   }
 
   .total-highlight {
-    background: #003366;
+    background: #0a3d91;
     color: #fff;
-    padding: 8px;
     font-weight: bold;
   }
 
-  .words {
-    margin-top: 15px;
-    border-top: 1px solid #ccc;
-    padding-top: 8px;
-    font-size: 11px;
-  }
-
+  /* ===== BANK ===== */
   .bank {
-    margin-top: 15px;
     border-top: 1px solid #ccc;
+    margin-top: 20px;
     padding-top: 10px;
-    font-size: 11px;
   }
 
-  .note {
-    margin-top: 10px;
-    border-top: 1px solid #ccc;
-    padding-top: 8px;
-    font-size: 11px;
-  }
-
-  .signature {
-    margin-top: 40px;
+  /* ===== FOOTER ===== */
+  .footer {
+    margin-top: 35px;
     text-align: right;
     font-size: 11px;
   }
@@ -146,62 +186,66 @@ module.exports = (invoice, tenant) => `
 </head>
 
 <body>
-
-<!-- HEADER -->
 <div class="header">
-  <div class="logo-box">
+
+  <!-- LEFT: LOGO -->
+  <div class="logo">
     ${tenant.companyLogo ? `<img src="${tenant.companyLogo}" />` : ""}
-    <div class="company-details">
-      <strong>${tenant.companyName}</strong><br/>
-      ${tenant.address}<br/>
-      ${tenant.city || ""} ${tenant.country || ""}<br/>
-      TRN: ${tenant.trn}
-    </div>
   </div>
 
+  <!-- CENTER: COMPANY INFO -->
+  <div class="company-info">
+    <div class="name">${tenant.companyName}</div>
+    ${tenant.address}<br/>
+    ${tenant.website || ""}<br/>
+    TRN: ${tenant.trn}
+  </div>
+
+  <!-- RIGHT: INVOICE -->
   <div class="invoice-title">
     TAX INVOICE<br/>
-    ${invoice.invoiceNumber}
+    <span class="invoice-number">${invoice.invoiceNumber}</span>
   </div>
+
 </div>
 
-<!-- TOP META -->
-<div class="top-info">
-  <div class="info-box">
+<!-- META -->
+<div class="meta">
+  <div class="meta-box">
     <strong>Invoice Date</strong><br/>
     ${new Date(invoice.invoiceDate).toDateString()}<br/><br/>
     <strong>P.O. No.</strong><br/>
     ${invoice.poNumber || "-"}
   </div>
 
-  <div class="info-box">
+  <div class="meta-box">
     <strong>Due Date</strong><br/>
     ${new Date(invoice.dueDate).toDateString()}<br/><br/>
     <strong>P.O. Date</strong><br/>
     ${invoice.poDate ? new Date(invoice.poDate).toDateString() : "-"}
   </div>
 
-  <div class="info-box">
+  <div class="meta-box">
     <strong>Terms</strong><br/>
-    ${invoice.terms || "—"}
+    ${invoice.terms || tenant.defaultTerms || ""}
   </div>
 </div>
 
-<!-- ADDRESS -->
+<!-- BILL / SHIP -->
 <div class="address-row">
   <div class="address-box">
     <strong>BILL TO</strong><br/>
     ${invoice.customer.company}<br/>
-    ${invoice.customer.address}<br/>
-    ${invoice.customer.city}, ${invoice.customer.country}<br/>
+    ${invoice.customer.billingStreet}<br/>
+    ${invoice.customer.billingCity}, ${invoice.customer.billingCountry}<br/>
     TRN: ${invoice.customer.vatNumber || "-"}
   </div>
 
   <div class="address-box">
     <strong>SHIP TO</strong><br/>
     ${invoice.customer.company}<br/>
-    ${invoice.customer.address}<br/>
-    ${invoice.customer.city}, ${invoice.customer.country}<br/>
+    ${invoice.customer.shippingStreet}<br/>
+    ${invoice.customer.shippingCity}, ${invoice.customer.shippingCountry}<br/>
     TRN: ${invoice.customer.vatNumber || "-"}
   </div>
 </div>
@@ -235,44 +279,36 @@ module.exports = (invoice, tenant) => `
 </table>
 
 <!-- SUMMARY -->
-<div class="summary-row">
-  <div class="tax-summary">
+<div class="summary">
+  <div class="summary-box">
     <strong>TAX SUMMARY</strong><br/><br/>
-    Currency: ${invoice.currency}<br/>
+    Currency: AED (United Arab Emirates Dirham)<br/><br/>
     Taxable Amount: ${invoice.subTotal}<br/>
-    Standard Rate: ${invoice.totalTax}
+    Standard Rate (5%): ${invoice.totalTax}
   </div>
 
-  <div class="total-summary">
-    <div><span>Sub Total</span><span>${invoice.subTotal}</span></div>
-    <div><span>Total Tax</span><span>${invoice.totalTax}</span></div>
-    <div class="total-highlight">
-      <span>Total (${invoice.currency})</span>
-      <span>${invoice.grandTotal}</span>
-    </div>
+  <div class="summary-box totals">
+    <table>
+      <tr><td>Sub Total</td><td align="right">${invoice.subTotal}</td></tr>
+      <tr><td>Total Tax</td><td align="right">${invoice.totalTax}</td></tr>
+      <tr class="total-highlight">
+        <td>Total (AED)</td>
+        <td align="right">${invoice.grandTotal}</td>
+      </tr>
+    </table>
   </div>
-</div>
-
-<div class="words">
-  <strong>Total in Words:</strong>
-  ${invoice.grandTotal} ${invoice.currency} Only
 </div>
 
 <!-- BANK -->
 <div class="bank">
-  <strong>Bank Details</strong><br/>
+  <strong>BANK DETAILS</strong><br/><br/>
   Bank Name: ${tenant.bankName}<br/>
   Account Name: ${tenant.accountName}<br/>
   IBAN: ${tenant.iban}<br/>
   Swift: ${tenant.swiftCode}
 </div>
 
-<div class="note">
-  <strong>Note:</strong><br/>
-  Thank you for your business
-</div>
-
-<div class="signature">
+<div class="footer">
   Authorized Signature
 </div>
 
