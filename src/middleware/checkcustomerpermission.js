@@ -1,4 +1,6 @@
-const customerPermission = (action) => {
+const prisma = require("../lib/prisma");
+
+const requirePermission = (permissionKey) => {
   return async (req, res, next) => {
     try {
       // 👑 SUPERADMIN → full access
@@ -9,7 +11,6 @@ const customerPermission = (action) => {
       // 👤 USER → fetch permission
       const permission = await prisma.permission.findUnique({
         where: { userId: Number(req.user.id) },
-
       });
 
       if (!permission) {
@@ -19,17 +20,10 @@ const customerPermission = (action) => {
         });
       }
 
-      const map = {
-        create: permission.canCreateCustomer,
-        view: permission.canViewCustomer,
-        update: permission.canUpdateCustomer,
-        delete: permission.canDeleteCustomer,
-      };
-
-      if (!map[action]) {
+      if (!permission[permissionKey]) {
         return res.status(403).json({
           success: false,
-          message: `You do not have permission to ${action} customers`,
+          message: "You do not have permission to perform this action",
         });
       }
 
@@ -43,4 +37,4 @@ const customerPermission = (action) => {
   };
 };
 
-module.exports = customerPermission;
+module.exports = { requirePermission };

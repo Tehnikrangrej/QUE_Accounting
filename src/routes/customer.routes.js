@@ -8,14 +8,14 @@ const { requirePermission } = require("../middleware/checkcustomerpermission");
 router.get(
   "/",
   auth,
-  //requirePermission("canViewCustomer"),
+  requirePermission("canViewCustomer"),
   controller.getAllCustomers
 );
 
 router.get(
   "/:id",
   auth,
- //requirePermission("canViewCustomer"),
+ requirePermission("canViewCustomer"),
   controller.getCustomerById
 );
 
@@ -25,7 +25,7 @@ router.get(
 router.post(
   "/",
   auth,
-  //requirePermission("canCreateCustomer"),
+  requirePermission("canCreateCustomer"),
   controller.createCustomer
 );
 
@@ -35,7 +35,7 @@ router.post(
 router.put(
   "/:id",
   auth,
-  //requirePermission("canUpdateCustomer"),
+  requirePermission("canUpdateCustomer"),
   controller.updateCustomer
 );
 
@@ -45,7 +45,7 @@ router.put(
 router.delete(
   "/:id",
   auth,
- //requirePermission("canDeleteCustomer"),
+ requirePermission("canDeleteCustomer"),
   controller.deleteCustomer
 );
 
