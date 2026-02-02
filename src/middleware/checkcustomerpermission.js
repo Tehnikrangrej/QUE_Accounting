@@ -1,5 +1,3 @@
-const prisma = require("../lib/prisma");
-
 const customerPermission = (action) => {
   return async (req, res, next) => {
     try {

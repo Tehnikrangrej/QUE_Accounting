@@ -13,7 +13,7 @@ router.post("/",createSuperAdmin);
 /**
  * AUTH
  */
-router.post("/login", superAdminLogin);
+
 
 /**
  * SUPERADMIN MANAGEMENT

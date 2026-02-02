@@ -14,6 +14,7 @@ app.get("/", (req, res) => {
   res.send("API is running...");
 });
 
+app.use("/api/login", require("./routes/login.routes"))
 app.use("/uploads", express.static("uploads"));
 app.use("/api/settings", require("./routes/tenantConfiguration.routes"));
 

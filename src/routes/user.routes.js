@@ -4,12 +4,12 @@ const auth = require("../middleware/auth");
 const controller = require("../controller/user.controller");
 
 router.post("/register", controller.register);
-router.post("/login", controller.login);
+
 
 router.get("/me", auth, controller.me);
 
 // SUPERADMIN actions (tenant scoped)
-router.post("/",controller.createUserBySuperAdmin);
+router.post("/", auth, controller.createUserBySuperAdmin);
 router.post("/adduser", auth, controller.addUserToTenant);
 router.get("/", auth, controller.getAllUsers);
 router.get("/:id", auth, controller.getUserById);

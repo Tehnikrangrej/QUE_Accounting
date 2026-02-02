@@ -1,22 +1,21 @@
 const router = require("express").Router();
 const auth = require("../middleware/auth");
-const requirePermission = require("../middleware/Permission")
 const controller = require("../controller/customer.controller");
-
+const { requirePermission } = require("../middleware/checkcustomerpermission");
 // ============================
 // VIEW
 // ============================
 router.get(
   "/",
   auth,
-  requirePermission("canViewCustomer"),
+  //requirePermission("canViewCustomer"),
   controller.getAllCustomers
 );
 
 router.get(
   "/:id",
   auth,
-  requirePermission("canViewCustomer"),
+ //requirePermission("canViewCustomer"),
   controller.getCustomerById
 );
 
@@ -26,7 +25,7 @@ router.get(
 router.post(
   "/",
   auth,
-  requirePermission("canCreateCustomer"),
+  //requirePermission("canCreateCustomer"),
   controller.createCustomer
 );
 
@@ -36,7 +35,7 @@ router.post(
 router.put(
   "/:id",
   auth,
-  requirePermission("canUpdateCustomer"),
+  //requirePermission("canUpdateCustomer"),
   controller.updateCustomer
 );
 
@@ -46,7 +45,7 @@ router.put(
 router.delete(
   "/:id",
   auth,
-  requirePermission("canDeleteCustomer"),
+ //requirePermission("canDeleteCustomer"),
   controller.deleteCustomer
 );
 
