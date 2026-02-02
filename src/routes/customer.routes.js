@@ -1,22 +1,53 @@
 const router = require("express").Router();
 const auth = require("../middleware/auth");
-const { isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/role");
-
+const requirePermission = require("../middleware/Permission")
 const controller = require("../controller/customer.controller");
 
-// All logged in users
-router.get("/", auth, controller.getAllCustomers);
-router.get("/:id", auth, controller.getCustomerById);
+// ============================
+// VIEW
+// ============================
+router.get(
+  "/",
+  auth,
+  requirePermission("canViewCustomer"),
+  controller.getAllCustomers
+);
 
-// Admin / SuperAdmin
-router.post("/", auth, isAdminOrSuperAdmin, controller.createCustomer);
-router.put("/:id", auth, isAdminOrSuperAdmin, controller.updateCustomer);
+router.get(
+  "/:id",
+  auth,
+  requirePermission("canViewCustomer"),
+  controller.getCustomerById
+);
 
-// SuperAdmin only
-router.delete("/:id", auth, isSuperAdmin, controller.deleteCustomer);
-// ================================
-// CUSTOMER ADMINS
-// ================================
+// ============================
+// CREATE
+// ============================
+router.post(
+  "/",
+  auth,
+  requirePermission("canCreateCustomer"),
+  controller.createCustomer
+);
 
+// ============================
+// UPDATE
+// ============================
+router.put(
+  "/:id",
+  auth,
+  requirePermission("canUpdateCustomer"),
+  controller.updateCustomer
+);
+
+// ============================
+// DELETE
+// ============================
+router.delete(
+  "/:id",
+  auth,
+  requirePermission("canDeleteCustomer"),
+  controller.deleteCustomer
+);
 
 module.exports = router;

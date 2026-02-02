@@ -4,6 +4,8 @@ const router = express.Router();
 // Auth middleware (JWT)
 const authMiddleware = require("../middleware/auth");
 
+const { superAdminAuth } = require("../middleware/superAdminAuth");
+
 // Controller
 const controller = require("../controller/tenantConfiguration.controller");
 
@@ -33,9 +35,10 @@ router.get(
  */
 router.post(
   "/",
-  authMiddleware,
-  upload.single("companyLogo"), // cloud upload
-  controller.saveTenantConfiguration
+  authMiddleware,              // 🔐 token verify
+  superAdminAuth,    // 👑 SUPERADMIN check
+  upload.single("companyLogo"),
+  controller.upsertTenantConfiguration
 );
 
 module.exports = router;

@@ -7,76 +7,74 @@ const jwt = require("jsonwebtoken");
  */
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, tenantId } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ message: "fullName, email, password are required" });
+      return res.status(400).json({ message: "name, email, password, Tenant ID required" });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return res.status(400).json({ message: "User already exists" });
+    const exists = await prisma.user.findUnique({ where: { email } });
+    if (exists) {
+      return res.status(409).json({ message: "User already exists" });
     }
 
-    const hash = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
-        name,              // ✅ FIX
+        name,
         email,
-        password: hash,
-        role: role || "USER"
-      }
+        password: hashed,
+        tenantId,
+        isActive: true,
+      },
     });
 
-    res.json({
+    res.status(201).json({
       success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
+      user: { id: user.id, name: user.name, email: user.email , tenantId: user.tenantId},
     });
-
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: err.message });
   }
 };
 /**
  * LOGIN USER / ADMIN
  */
 exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-   const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ message: "User not found" });
-    
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(401).json({ message: "Invalid password" });
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { tenant: true },
+  });
 
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+  if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  const ok = await bcrypt.compare(password, user.password);
+  if (!ok) return res.status(401).json({ message: "Invalid password" });
+
+  const token = jwt.sign(
+    {
+      id: user.id,
+      tenantId: user.tenantId,
+      type: "USER",
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    },
+  });
 };
+
 
 /**
  * GET MY PROFILE
@@ -84,126 +82,215 @@ exports.login = async (req, res) => {
 exports.me = async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { id: true, email: true, name: true, role: true, createdAt: true }
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      tenantId: true,
+      createdAt: true,
+    },
   });
 
-  res.json(user);
+  res.json({ success: true, user });
 };
+
 
 /**
  * ADMIN: GET ALL USERS
  */
 exports.getAllUsers = async (req, res) => {
+  if (req.user.type !== "SUPERADMIN") {
+    return res.status(403).json({ message: "SuperAdmin only" });
+  }
+
   const users = await prisma.user.findMany({
+    where: { tenantId: req.user.tenantId },
     select: {
       id: true,
-      email: true,
       name: true,
-      role: true,
+      email: true,
       createdAt: true,
-      permission: {
-        select: {
-          canCreateInvoice: true,
-          canViewInvoice: true,
-          canUpdateInvoice: true,
-          canDeleteInvoice: true
-        }
-      }
-    }
-  });
-  res.json(users);
-};
-
-/**
- * ADMIN: CREATE USER
- */
-exports.createUser = async (req, res) => {
-  const { email, password, name, role } = req.body;
-
-  const hashed = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
-    data: { email, password: hashed, name, role }
+    },
   });
 
-  res.json(user);
+  res.json({ success: true, users });
 };
 
-/**
- * ADMIN: UPDATE USER
- */
-exports.updateUser = async (req, res) => {
-  const { id } = req.params;
-  const { name, role } = req.body;
-  const user = await prisma.user.update({
-    where: { id: Number(id) },
-    data: { name, role }
-  });
 
-  res.json(user);
-};
-
-/** ===============================
- * ADMIN: Reset User Password
- * =============================== */
-exports.adminResetUserPassword = async (req, res) => {
+exports.createUserBySuperAdmin = async (req, res) => {
   try {
-    // Only admin or superadmin
-    if (req.user.role !== "ADMIN" && req.user.role !== "SUPERADMIN") {
-      return res.status(403).json({
-        success: false,
-        message: "You are not allowed to perform this action"
-      });
-    }
+    const { name, email, password, tenantId } = req.body;
 
-    const { userId, newPassword } = req.body;
-
-    if (!userId || !newPassword) {
+    // basic validation
+    if (!name || !email || !password || !tenantId) {
       return res.status(400).json({
-        success: false,
-        message: "userId and newPassword are required"
+        message: "name, email, password and tenantId are required",
       });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
+    // check tenant exists
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
     });
 
-    if (!user) {
+    if (!tenant) {
       return res.status(404).json({
-        success: false,
-        message: "User not found"
+        message: "Tenant not found",
       });
     }
 
-    const hashed = await bcrypt.hash(newPassword, 10);
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password: hashed }
+    // check user already exists
+    const exists = await prisma.user.findUnique({
+      where: { email },
     });
 
-    res.json({
+    if (exists) {
+      return res.status(409).json({
+        message: "User already exists",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        isActive: true,
+
+        // 🔥 tenant from BODY (simple)
+        tenant: {
+          connect: {
+            id: tenantId,
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        tenantId: true,
+        createdAt: true,
+      },
+    });
+
+    res.status(201).json({
       success: true,
-      message: "User password reset successfully"
+      message: "User created successfully",
+      user,
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
-  
-/**
- * ADMIN: DELETE USER
+
+/** ADD USER TO TENANT */
+exports.addUserToTenant = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    // TEMP: tenantId body se lo (debug/simple ke liye)
+    const tenantId = req.body.tenantId;
+
+    if (!name || !email || !password || !tenantId) {
+      return res.status(400).json({
+        message: "name, email, password and tenantId are required",
+      });
+    }
+
+    const exists = await prisma.user.findUnique({ where: { email } });
+    if (exists) {
+      return res.status(409).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        isActive: true,
+
+        // 🔥 THIS IS THE FIX
+        tenant: {
+          connect: {
+            id: tenantId,
+          },
+        },
+
+        permission: {
+          create: {},
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        tenantId: true,
+        createdAt: true,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+/** GET BY ID */
+exports.getUserById = async (req, res) => {
+  const user = await prisma.user.findFirst({
+    where: {
+      id: Number(req.params.id),
+      tenantId: req.user.tenantId,
+    },
+  });
+
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  res.json({ success: true, user });
+};
+
+/** UPDATE USER
+ */
+
+exports.updateUser = async (req, res) => {
+  const { id } = req.params;
+
+  // USER can update only himself
+  if (req.user.type === "USER" && Number(id) !== req.user.id) {
+    return res.status(403).json({ message: "Not allowed" });
+  }
+
+  const user = await prisma.user.update({
+    where: { id: Number(id) },
+    data: req.body,
+  });
+
+  res.json({ success: true, user });
+};
+
+/** DELETE USER
  */
 exports.deleteUser = async (req, res) => {
   const { id } = req.params;
 
+  if (req.user.type === "USER" && Number(id) !== req.user.id) {
+    return res.status(403).json({ message: "Not allowed" });
+  }
+
   await prisma.user.delete({
-    where: { id: Number(id) }
+    where: { id: Number(id) },
   });
 
   res.json({ success: true, message: "User deleted" });
 };
+
+

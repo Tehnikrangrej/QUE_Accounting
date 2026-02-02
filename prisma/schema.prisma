@@ -6,16 +6,47 @@ datasource db {
   provider = "postgresql"
 }
 
+model SuperAdmin {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenants Tenant[]
+}
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  isActive    Boolean  @default(true)
+
+  createdById Int
+  createdBy   SuperAdmin @relation(fields: [createdById], references: [id])
+
+  users       User[]
+  configuration TenantConfiguration?
+  subscription  Subscription?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+
 model User {
   id                   Int                  @id @default(autoincrement())
   email                String               @unique
   password             String
   name                 String?
-  role                 String               @default("USER")
+  tenantId             String
+  tenant               Tenant               @relation(fields: [tenantId], references: [id])
+  isActive             Boolean              @default(true)
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   permission           Permission?
-  tenantConfigurations TenantConfiguration?
+  tenantConfigurations TenantConfiguration? @relation(fields: [tenantConfigurationsid], references: [id])
+tenantConfigurationsid Int?
 }
 
 /// =========================
@@ -146,12 +177,22 @@ model Permission {
   canViewInvoice   Boolean  @default(false)
   canUpdateInvoice Boolean  @default(false)
   canDeleteInvoice Boolean  @default(false)
+
+  canCreateCustomer  Boolean  @default(false)
+  canViewCustomer    Boolean  @default(false)
+  canUpdateCustomer  Boolean  @default(false)
+  canDeleteCustomer  Boolean  @default(false)
+
+
+   canEditTenantConfig    Boolean  @default(false)
   createdAt        DateTime @default(now())
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model TenantConfiguration {
   id                Int      @id @default(autoincrement())
+  tenantId        String   @unique
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   companyName       String
   address           String?
   phone             String?
@@ -169,7 +210,37 @@ model TenantConfiguration {
   swiftCode         String?
   defaultFooterNote String?
   defaultTerms      String?
-  userId            Int      @unique
-  user              User     @relation(fields: [userId], references: [id])
+
+  users User[]
 }
+model Subscription {
+  id           String   @id @default(uuid())
+
+  tenantId     String   @unique
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+
+  plan         SubscriptionPlan
+  status       SubscriptionStatus
+
+  startDate    DateTime
+  endDate      DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
 

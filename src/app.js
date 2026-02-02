@@ -17,7 +17,8 @@ app.get("/", (req, res) => {
 app.use("/uploads", express.static("uploads"));
 app.use("/api/settings", require("./routes/tenantConfiguration.routes"));
 
-
+app.use("/api/superadmin", require("./routes/superAdmin.routes"));
+app.use("/api/tenants", require("./routes/tenant.routes"));
 
 app.use("/api/users", require("./routes/user.routes"));
 app.use("/api/customers", require("./routes/customer.routes"));
