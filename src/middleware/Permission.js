@@ -10,7 +10,8 @@ const customerPermission = (action) => {
 
       // 👤 USER → fetch permission
       const permission = await prisma.permission.findUnique({
-        where: { userId: req.user.id },
+        where: { userId: Number(req.user.id) },
+
       });
 
       if (!permission) {

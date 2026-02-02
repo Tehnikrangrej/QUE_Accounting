@@ -9,7 +9,9 @@ exports.createSuperAdmin = async (req, res) => {
   try {
     const { email, password, name } = req.body;
 
-    const existingAdmin = await prisma.superAdmin.findFirst();
+    const existingAdmin = await prisma.superAdmin.findUnique({
+        where: { email },
+    });
     if (existingAdmin) {
       return res.status(403).json({
         message: "SuperAdmin already exists",
