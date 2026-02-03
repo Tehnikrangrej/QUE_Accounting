@@ -5,9 +5,26 @@ const prisma = require('../lib/prisma');
  * ============================*/
 exports.createTenant = async (req, res) => {
   try {
-    const { name } = req.body;
+    // 🔐 Extra safety (even if middleware exists)
+    if (req.user.type !== "SUPERADMIN") {
+      return res.status(403).json({
+        message: "Only SuperAdmin can manage tenant configuration",
+      });
+    }
+
+    const { name, domain } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        message: "Tenant name is required",
+      });
+    }
+
     const superAdminId = req.user.id;
 
+    /* ============================
+       1️⃣ Create Tenant
+    ============================ */
     const tenant = await prisma.tenant.create({
       data: {
         name,
@@ -15,14 +32,21 @@ exports.createTenant = async (req, res) => {
       },
     });
 
+    /* ============================
+       3️⃣ Response
+    ============================ */
     res.status(201).json({
       success: true,
+      message: "Tenant created successfully",
       tenant,
     });
+
   } catch (error) {
+    console.error("CREATE TENANT ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 exports.getAllTenants = async (req, res) => {
   try {
     const tenants = await prisma.tenant.findMany({

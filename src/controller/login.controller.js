@@ -1,4 +1,4 @@
-const prisma = require ("../lib/prisma");
+const prisma = require("../lib/prisma");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -25,13 +25,13 @@ exports.login = async (req, res) => {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      // ✅ ALLOW login WITHOUT tenant
       const token = jwt.sign(
         {
           id: superAdmin.id,
           tenantId: superAdmin.tenantId || null,
+          role: "SUPERADMIN",
           type: "SUPERADMIN",
-          isBootstrapped: !!superAdmin.tenantId, // 🔥 IMPORTANT FLAG
+          isBootstrapped: !!superAdmin.tenantId,
         },
         process.env.JWT_SECRET,
         { expiresIn: "1d" }
@@ -46,7 +46,9 @@ exports.login = async (req, res) => {
           id: superAdmin.id,
           name: superAdmin.name,
           email: superAdmin.email,
+          role: "SUPERADMIN",
         },
+        tenant: superAdmin.tenantId || null,
       });
     }
 
@@ -55,7 +57,10 @@ exports.login = async (req, res) => {
     ============================ */
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { permission: true },
+      include: {
+        permission: true,
+        tenant: true, // ✅ CORRECT
+      },
     });
 
     if (!user) {
@@ -77,6 +82,7 @@ exports.login = async (req, res) => {
       {
         id: user.id,
         tenantId: user.tenantId,
+        role: user.role,
         type: "USER",
       },
       process.env.JWT_SECRET,
@@ -91,10 +97,14 @@ exports.login = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
         permission: user.permission,
       },
+      tenant: user.tenant, // ✅ FULL TENANT OBJECT
     });
+
   } catch (error) {
+    console.error("LOGIN ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
