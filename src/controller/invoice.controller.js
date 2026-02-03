@@ -2,14 +2,59 @@ const prisma = require("../lib/prisma");
 const generateInvoicePdf = require("../utils/generateInvoicePdf");
 const uploadInvoicePdf = require("../utils/uploadInvoicePdf");
 
-/* ===============================
+/* =====================================================
+   HELPER: RESOLVE CREATOR DETAILS (USER / SUPERADMIN)
+===================================================== */
+async function getCreatorDetails(createdById, createdByType) {
+  if (createdByType === "SUPERADMIN") {
+    return prisma.superAdmin.findUnique({
+      where: { id: createdById },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true,
+        tenants: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
+  // USER
+  return prisma.user.findUnique({
+    where: { id: createdById },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      tenantId: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+      permission: true,
+      tenant: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+}
+
+/* =====================================================
    CREATE INVOICE
-================================ */
+===================================================== */
 exports.createInvoice = async (req, res) => {
   try {
     let tenantId = req.user.tenantId;
 
-    // 🔥 SUPERADMIN can pass tenantId explicitly
+    // 🔥 SUPERADMIN explicitly passes tenantId
     if (req.user.type === "SUPERADMIN") {
       tenantId = req.body.tenantId;
     }
@@ -19,6 +64,11 @@ exports.createInvoice = async (req, res) => {
         success: false,
         message: "Tenant context missing",
       });
+    }
+
+    // prevent spoofing
+    if (req.user.type !== "SUPERADMIN") {
+      delete req.body.tenantId;
     }
 
     const {
@@ -53,7 +103,7 @@ exports.createInvoice = async (req, res) => {
       });
     }
 
-    /* 🔢 Invoice number PER TENANT */
+    /* 🔢 Invoice number per tenant */
     const lastInvoice = await prisma.invoice.findFirst({
       where: { tenantId },
       orderBy: { createdAt: "desc" },
@@ -91,7 +141,7 @@ exports.createInvoice = async (req, res) => {
 
     const grandTotal = subTotal + totalTax - Number(discount);
 
-    /* 💾 Create Invoice */
+    /* 💾 CREATE INVOICE */
     const invoice = await prisma.invoice.create({
       data: {
         tenantId,
@@ -104,11 +154,18 @@ exports.createInvoice = async (req, res) => {
         poDate: poDate ? new Date(poDate) : null,
         adminNote,
         terms,
+
         subTotal,
         totalTax,
         discount,
         grandTotal,
-        items: { create: invoiceItems },
+
+        createdById: req.user.id,
+        createdByType: req.user.type, // SUPERADMIN | USER
+
+        items: {
+          create: invoiceItems,
+        },
       },
       include: {
         customer: true,
@@ -116,31 +173,37 @@ exports.createInvoice = async (req, res) => {
       },
     });
 
-    /* 📄 Generate PDF using TENANT config */
+    /* 📄 PDF GENERATION */
     const tenantConfig = await prisma.tenantConfiguration.findUnique({
       where: { tenantId },
     });
 
-    const pdfBuffer = await generateInvoicePdf(invoice, tenantConfig);
-    const pdfUrl = await uploadInvoicePdf(pdfBuffer, invoice.invoiceNumber);
+    if (tenantConfig) {
+      const pdfBuffer = await generateInvoicePdf(invoice, tenantConfig);
+      const pdfUrl = await uploadInvoicePdf(pdfBuffer, invoice.invoiceNumber);
 
-    const updatedInvoice = await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: { pdfUrl },
-      include: {
-        customer: true,
-        items: true,
-      },
-    });
+      await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { pdfUrl },
+      });
+    }
+
+    const createdBy = await getCreatorDetails(
+      invoice.createdById,
+      invoice.createdByType
+    );
 
     res.status(201).json({
       success: true,
       message: "Invoice created successfully",
-      data: updatedInvoice,
+      data: {
+        ...invoice,
+        createdBy,
+      },
     });
 
   } catch (error) {
-    console.error("Create Invoice Error:", error);
+    console.error("CREATE INVOICE ERROR:", error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -148,30 +211,40 @@ exports.createInvoice = async (req, res) => {
   }
 };
 
-/* ===============================
-   GET ALL INVOICES
-================================ */
+/* =====================================================
+   GET ALL INVOICES (TENANT SCOPED)
+===================================================== */
 exports.getAllInvoices = async (req, res) => {
   const tenantId = req.user.tenantId;
 
-  const data = await prisma.invoice.findMany({
+  const invoices = await prisma.invoice.findMany({
     where: { tenantId },
-    include: { customer: true, items: true },
+    include: {
+      customer: true,
+      items: true,
+    },
     orderBy: { createdAt: "desc" },
   });
 
-  res.json({ success: true, data });
+  res.json({
+    success: true,
+    count: invoices.length,
+    data: invoices,
+  });
 };
 
-/* ===============================
-   GET INVOICE BY ID
-================================ */
+/* =====================================================
+   GET INVOICE BY ID (WITH CREATOR DETAILS)
+===================================================== */
 exports.getInvoiceById = async (req, res) => {
   const tenantId = req.user.tenantId;
 
   const invoice = await prisma.invoice.findFirst({
     where: { id: req.params.id, tenantId },
-    include: { customer: true, items: true },
+    include: {
+      customer: true,
+      items: true,
+    },
   });
 
   if (!invoice) {
@@ -181,53 +254,70 @@ exports.getInvoiceById = async (req, res) => {
     });
   }
 
-  res.json({ success: true, data: invoice });
+  const createdBy = await getCreatorDetails(
+    invoice.createdById,
+    invoice.createdByType
+  );
+
+  res.json({
+    success: true,
+    data: {
+      ...invoice,
+      createdBy,
+    },
+  });
 };
 
-/* ===============================
+/* =====================================================
    UPDATE INVOICE STATUS
-================================ */
+===================================================== */
 exports.updateInvoiceStatus = async (req, res) => {
   const tenantId = req.user.tenantId;
 
-  const invoice = await prisma.invoice.updateMany({
+  const result = await prisma.invoice.updateMany({
     where: { id: req.params.id, tenantId },
     data: { status: req.body.status },
   });
 
-  if (!invoice.count) {
+  if (!result.count) {
     return res.status(404).json({
       success: false,
       message: "Invoice not found",
     });
   }
 
-  res.json({ success: true, message: "Invoice status updated" });
+  res.json({
+    success: true,
+    message: "Invoice status updated",
+  });
 };
 
-/* ===============================
+/* =====================================================
    DELETE INVOICE
-================================ */
+===================================================== */
 exports.deleteInvoice = async (req, res) => {
   const tenantId = req.user.tenantId;
 
-  const deleted = await prisma.invoice.deleteMany({
+  const result = await prisma.invoice.deleteMany({
     where: { id: req.params.id, tenantId },
   });
 
-  if (!deleted.count) {
+  if (!result.count) {
     return res.status(404).json({
       success: false,
       message: "Invoice not found",
     });
   }
 
-  res.json({ success: true, message: "Invoice deleted" });
+  res.json({
+    success: true,
+    message: "Invoice deleted",
+  });
 };
 
-/* ===============================
-   DOWNLOAD PDF
-================================ */
+/* =====================================================
+   DOWNLOAD INVOICE PDF
+===================================================== */
 exports.downloadInvoicePdf = async (req, res) => {
   const tenantId = req.user.tenantId;
 

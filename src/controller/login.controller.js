@@ -108,3 +108,108 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.getMe = async (req, res) => {
+  try {
+    const { id, type, tenantId } = req.user;
+
+    let user;
+
+    /* ============================
+       SUPERADMIN
+    ============================ */
+    if (type === "SUPERADMIN") {
+      user = await prisma.superAdmin.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true,
+          updatedAt: true,
+          tenants: {
+            select: {
+              id: true,
+              name: true,
+              isActive: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "SuperAdmin not found",
+        });
+      }
+
+      // 🔥 tenant ke customers (agar tenantId JWT me hai)
+      let customers = [];
+      if (tenantId) {
+        customers = await prisma.customer.findMany({
+          where: { tenantId },
+          orderBy: { createdAt: "desc" },
+        });
+      }
+
+      return res.json({
+        success: true,
+        type: "SUPERADMIN",
+        user,
+        customers,
+      });
+    }
+
+    /* ============================
+       USER
+    ============================ */
+    user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        tenantId: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        permission: true,
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // 🔥 USER ke tenant ke customers
+    const customers = await prisma.customer.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json({
+      success: true,
+      type: "USER",
+      user,
+      customers,
+    });
+
+  } catch (error) {
+    console.error("GET ME ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

@@ -149,12 +149,22 @@ model Invoice {
 
    pdfUrl        String?   
 
+
+/* 🔥 CREATED BY */
+  createdById   Int
+  createdByType CreatorType
   /* =========================
      META
   ========================= */
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+enum CreatorType {
+  SUPERADMIN
+  USER
+}
+
 model InvoiceItem {
   id          String @id @default(uuid())
 
