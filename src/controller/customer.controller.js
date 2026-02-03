@@ -2,11 +2,30 @@ const prisma = require("../lib/prisma");
 
 /**
  * ============================
- * CREATE CUSTOMER (ADMIN / SUPERADMIN)
+ * CREATE CUSTOMER
  * ============================
  */
 exports.createCustomer = async (req, res) => {
   try {
+    let tenantId = req.user.tenantId;
+
+    // 🔥 SUPERADMIN can choose tenant explicitly
+    if (req.user.type === "SUPERADMIN") {
+      tenantId = req.body.tenantId;
+    }
+
+    if (!tenantId) {
+      return res.status(403).json({
+        success: false,
+        message: "Tenant context missing",
+      });
+    }
+
+    // 🔒 Prevent spoofing by normal users
+    if (req.user.type !== "SUPERADMIN") {
+      delete req.body.tenantId;
+    }
+
     const {
       company,
       vatNumber,
@@ -16,21 +35,18 @@ exports.createCustomer = async (req, res) => {
       currency,
       defaultLanguage,
 
-      // main address
       address,
       city,
       state,
       zipCode,
       country,
 
-      // billing
       billingStreet,
       billingCity,
       billingState,
       billingZipCode,
       billingCountry,
 
-      // shipping
       shippingStreet,
       shippingCity,
       shippingState,
@@ -67,6 +83,8 @@ exports.createCustomer = async (req, res) => {
 
     const customer = await prisma.customer.create({
       data: {
+        tenantId,
+
         company,
         vatNumber,
         phone,
@@ -91,14 +109,14 @@ exports.createCustomer = async (req, res) => {
       },
     });
 
-    return res.json({
+    res.json({
       success: true,
       message: "Customer created successfully",
       customer,
     });
   } catch (error) {
     console.error("Create customer error:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -107,23 +125,25 @@ exports.createCustomer = async (req, res) => {
 
 /**
  * ============================
- * GET ALL CUSTOMERS (ALL LOGGED IN USERS)
+ * GET ALL CUSTOMERS
  * ============================
  */
 exports.getAllCustomers = async (req, res) => {
   try {
+    const tenantId = req.user.tenantId;
+
     const customers = await prisma.customer.findMany({
+      where: { tenantId },
       orderBy: { createdAt: "desc" },
     });
 
-    return res.json({
+    res.json({
       success: true,
       count: customers.length,
       customers,
     });
   } catch (error) {
-    console.error("Get all customers error:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -138,9 +158,10 @@ exports.getAllCustomers = async (req, res) => {
 exports.getCustomerById = async (req, res) => {
   try {
     const { id } = req.params;
+    const tenantId = req.user.tenantId;
 
-    const customer = await prisma.customer.findUnique({
-      where: { id },
+    const customer = await prisma.customer.findFirst({
+      where: { id, tenantId },
     });
 
     if (!customer) {
@@ -150,36 +171,32 @@ exports.getCustomerById = async (req, res) => {
       });
     }
 
-    return res.json({
-      success: true,
-      customer,
-    });
+    res.json({ success: true, customer });
   } catch (error) {
-    console.error("Get customer error:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error.message,
     });
   }
-  
 };
 
 /**
  * ============================
- * UPDATE CUSTOMER (ADMIN / SUPERADMIN)
+ * UPDATE CUSTOMER
  * ============================
  */
 exports.updateCustomer = async (req, res) => {
   try {
     const { id } = req.params;
+    const tenantId = req.user.tenantId;
 
-    // prevent dangerous updates
     delete req.body.id;
+    delete req.body.tenantId;
     delete req.body.createdAt;
     delete req.body.updatedAt;
 
-    const existing = await prisma.customer.findUnique({
-      where: { id },
+    const existing = await prisma.customer.findFirst({
+      where: { id, tenantId },
     });
 
     if (!existing) {
@@ -189,7 +206,6 @@ exports.updateCustomer = async (req, res) => {
       });
     }
 
-    // handle sameAsBilling logic
     if (req.body.sameAsBilling) {
       req.body.shippingStreet = req.body.billingStreet;
       req.body.shippingCity = req.body.billingCity;
@@ -205,14 +221,13 @@ exports.updateCustomer = async (req, res) => {
       data: req.body,
     });
 
-    return res.json({
+    res.json({
       success: true,
       message: "Customer updated successfully",
       customer: updated,
     });
   } catch (error) {
-    console.error("Update customer error:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -221,15 +236,16 @@ exports.updateCustomer = async (req, res) => {
 
 /**
  * ============================
- * DELETE CUSTOMER (SUPERADMIN ONLY)
+ * DELETE CUSTOMER
  * ============================
  */
 exports.deleteCustomer = async (req, res) => {
   try {
     const { id } = req.params;
+    const tenantId = req.user.tenantId;
 
-    const existing = await prisma.customer.findUnique({
-      where: { id },
+    const existing = await prisma.customer.findFirst({
+      where: { id, tenantId },
     });
 
     if (!existing) {
@@ -243,16 +259,14 @@ exports.deleteCustomer = async (req, res) => {
       where: { id },
     });
 
-    return res.json({
+    res.json({
       success: true,
       message: "Customer deleted successfully",
     });
   } catch (error) {
-    console.error("Delete customer error:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
-

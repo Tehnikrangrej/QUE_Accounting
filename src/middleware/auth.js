@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 module.exports = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Token required" });
   }
 
@@ -12,16 +12,9 @@ module.exports = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    /**
-     * decoded payload example:
-     * USER:
-     * { id, tenantId, type: "USER" }
-     *
-     * SUPERADMIN:
-     * { id, tenantId, type: "SUPERADMIN" }
-     */
-
+    // decoded MUST contain: id, type, tenantId (tenantId may be null for SUPERADMIN)
     req.user = decoded;
+
     next();
   } catch (err) {
     return res.status(401).json({ message: "Invalid token" });

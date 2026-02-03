@@ -28,7 +28,7 @@ exports.login = async (req, res) => {
       const token = jwt.sign(
         {
           id: superAdmin.id,
-          tenantId: superAdmin.tenantId || null,
+          tenantId: superAdmin.tenantId,
           role: "SUPERADMIN",
           type: "SUPERADMIN",
           isBootstrapped: !!superAdmin.tenantId,

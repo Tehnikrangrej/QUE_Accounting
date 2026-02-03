@@ -7,6 +7,20 @@ const uploadInvoicePdf = require("../utils/uploadInvoicePdf");
 ================================ */
 exports.createInvoice = async (req, res) => {
   try {
+    let tenantId = req.user.tenantId;
+
+    // 🔥 SUPERADMIN can pass tenantId explicitly
+    if (req.user.type === "SUPERADMIN") {
+      tenantId = req.body.tenantId;
+    }
+
+    if (!tenantId) {
+      return res.status(403).json({
+        success: false,
+        message: "Tenant context missing",
+      });
+    }
+
     const {
       customerId,
       invoiceDate,
@@ -27,7 +41,21 @@ exports.createInvoice = async (req, res) => {
       });
     }
 
+    /* 🔒 Validate customer belongs to tenant */
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, tenantId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found for this tenant",
+      });
+    }
+
+    /* 🔢 Invoice number PER TENANT */
     const lastInvoice = await prisma.invoice.findFirst({
+      where: { tenantId },
       orderBy: { createdAt: "desc" },
       select: { invoiceNumber: true },
     });
@@ -63,9 +91,10 @@ exports.createInvoice = async (req, res) => {
 
     const grandTotal = subTotal + totalTax - Number(discount);
 
-    // 💾 Create invoice (UNCHANGED)
+    /* 💾 Create Invoice */
     const invoice = await prisma.invoice.create({
       data: {
+        tenantId,
         invoiceNumber,
         customerId,
         invoiceDate: new Date(invoiceDate),
@@ -87,12 +116,12 @@ exports.createInvoice = async (req, res) => {
       },
     });
 
-    // 📄 PDF GENERATION (ADDED)
-    const tenant = await prisma.tenantConfiguration.findUnique({
-      where: { userId: req.user.id },
+    /* 📄 Generate PDF using TENANT config */
+    const tenantConfig = await prisma.tenantConfiguration.findUnique({
+      where: { tenantId },
     });
 
-    const pdfBuffer = await generateInvoicePdf(invoice, tenant);
+    const pdfBuffer = await generateInvoicePdf(invoice, tenantConfig);
     const pdfUrl = await uploadInvoicePdf(pdfBuffer, invoice.invoiceNumber);
 
     const updatedInvoice = await prisma.invoice.update({
@@ -106,7 +135,7 @@ exports.createInvoice = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Invoice created successfully & PDF generated",
+      message: "Invoice created successfully",
       data: updatedInvoice,
     });
 
@@ -119,39 +148,91 @@ exports.createInvoice = async (req, res) => {
   }
 };
 
+/* ===============================
+   GET ALL INVOICES
+================================ */
 exports.getAllInvoices = async (req, res) => {
+  const tenantId = req.user.tenantId;
+
   const data = await prisma.invoice.findMany({
+    where: { tenantId },
     include: { customer: true, items: true },
     orderBy: { createdAt: "desc" },
   });
+
   res.json({ success: true, data });
 };
 
+/* ===============================
+   GET INVOICE BY ID
+================================ */
 exports.getInvoiceById = async (req, res) => {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: req.params.id },
+  const tenantId = req.user.tenantId;
+
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: req.params.id, tenantId },
     include: { customer: true, items: true },
   });
-  if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
+
+  if (!invoice) {
+    return res.status(404).json({
+      success: false,
+      message: "Invoice not found",
+    });
+  }
+
   res.json({ success: true, data: invoice });
 };
 
+/* ===============================
+   UPDATE INVOICE STATUS
+================================ */
 exports.updateInvoiceStatus = async (req, res) => {
-  const invoice = await prisma.invoice.update({
-    where: { id: req.params.id },
+  const tenantId = req.user.tenantId;
+
+  const invoice = await prisma.invoice.updateMany({
+    where: { id: req.params.id, tenantId },
     data: { status: req.body.status },
   });
-  res.json({ success: true, data: invoice });
+
+  if (!invoice.count) {
+    return res.status(404).json({
+      success: false,
+      message: "Invoice not found",
+    });
+  }
+
+  res.json({ success: true, message: "Invoice status updated" });
 };
 
+/* ===============================
+   DELETE INVOICE
+================================ */
 exports.deleteInvoice = async (req, res) => {
-  await prisma.invoice.delete({ where: { id: req.params.id } });
+  const tenantId = req.user.tenantId;
+
+  const deleted = await prisma.invoice.deleteMany({
+    where: { id: req.params.id, tenantId },
+  });
+
+  if (!deleted.count) {
+    return res.status(404).json({
+      success: false,
+      message: "Invoice not found",
+    });
+  }
+
   res.json({ success: true, message: "Invoice deleted" });
 };
 
+/* ===============================
+   DOWNLOAD PDF
+================================ */
 exports.downloadInvoicePdf = async (req, res) => {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: req.params.id },
+  const tenantId = req.user.tenantId;
+
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: req.params.id, tenantId },
   });
 
   if (!invoice?.pdfUrl) {
@@ -161,7 +242,6 @@ exports.downloadInvoicePdf = async (req, res) => {
     });
   }
 
-  // 🔥 Force correct PDF handling
   const downloadUrl = invoice.pdfUrl.replace(
     "/upload/",
     "/upload/fl_attachment/"
@@ -169,4 +249,3 @@ exports.downloadInvoicePdf = async (req, res) => {
 
   res.redirect(downloadUrl);
 };
-

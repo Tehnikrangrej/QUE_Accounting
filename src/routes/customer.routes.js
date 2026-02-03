@@ -1,52 +1,40 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
+
 const auth = require("../middleware/auth");
-const controller = require("../controller/customer.controller");
-const { requirePermission } = require("../middleware/checkcustomerpermission");
-// ============================
-// VIEW
-// ============================
-router.get(
-  "/",
-  auth,
-  requirePermission("canViewCustomer"),
-  controller.getAllCustomers
-);
+const requirePermission = require("../middleware/checkcustomerpermission");
+const customerController = require("../controller/customer.controller");
 
-router.get(
-  "/:id",
-  auth,
- requirePermission("canViewCustomer"),
-  controller.getCustomerById
-);
+router.use(auth);
 
-// ============================
-// CREATE
-// ============================
 router.post(
   "/",
-  auth,
   requirePermission("canCreateCustomer"),
-  controller.createCustomer
+  customerController.createCustomer
 );
 
-// ============================
-// UPDATE
-// ============================
+router.get(
+  "/",
+  requirePermission("canViewCustomer"),
+  customerController.getAllCustomers
+);
+
+router.get(
+  "/:id",
+  requirePermission("canViewCustomer"),
+  customerController.getCustomerById
+);
+
 router.put(
   "/:id",
-  auth,
   requirePermission("canUpdateCustomer"),
-  controller.updateCustomer
+  customerController.updateCustomer
 );
 
-// ============================
-// DELETE
-// ============================
 router.delete(
   "/:id",
-  auth,
- requirePermission("canDeleteCustomer"),
-  controller.deleteCustomer
+  requirePermission("canDeleteCustomer"),
+  customerController.deleteCustomer
 );
 
 module.exports = router;
